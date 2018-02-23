@@ -17,12 +17,12 @@ var (
 
 // Cache struct is concurrency-safe in-memory cache based on b-tree and hash-map indexing.
 type Cache struct {
-	done   chan bool
+	done   chan struct{}
 	tr     *btree.BTree
 	trMu   sync.RWMutex
 	qu     map[string]item
 	quMu   sync.RWMutex
-	quCh   chan bool
+	quCh   chan struct{}
 	degree int
 }
 
@@ -34,8 +34,8 @@ func NewCache() (ce *Cache) {
 // NewCacheDegree returns a new Cache given degree.
 func NewCacheDegree(degree int) (ce *Cache) {
 	ce = &Cache{
-		done:   make(chan bool),
-		quCh:   make(chan bool, 1),
+		done:   make(chan struct{}),
+		quCh:   make(chan struct{}, 1<<10),
 		degree: degree,
 	}
 	ce.Flush()
@@ -55,7 +55,7 @@ func (ce *Cache) Flush() {
 
 // Close closes the cache. It must be called if the cache will not use.
 func (ce *Cache) Close() {
-	ce.done <- true
+	ce.done <- struct{}{}
 }
 
 func (ce *Cache) queueWorker() {
@@ -118,7 +118,7 @@ func (ce *Cache) Set(key string, val *Value) {
 	ce.qu[key] = item{Key: key, Val: val}
 	ce.quMu.Unlock()
 	select {
-	case ce.quCh <- true:
+	case ce.quCh <- struct{}{}:
 	default:
 	}
 }
@@ -145,7 +145,7 @@ func (ce *Cache) GetOrSet(key string, setval *Value) (val *Value, found bool) {
 		ce.quMu.Unlock()
 		ce.trMu.RUnlock()
 		select {
-		case ce.quCh <- true:
+		case ce.quCh <- struct{}{}:
 		default:
 		}
 		val = setval
@@ -180,7 +180,7 @@ func (ce *Cache) GetAndSet(key string, f func(*Value) *Value) (setval *Value) {
 	ce.quMu.Unlock()
 	ce.trMu.RUnlock()
 	select {
-	case ce.quCh <- true:
+	case ce.quCh <- struct{}{}:
 	default:
 	}
 	return
