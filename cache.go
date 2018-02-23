@@ -157,3 +157,31 @@ func (ce *Cache) GetOrSet(key string, setval *Value) (val *Value, found bool) {
 	val = r.(item).Val
 	return
 }
+
+// GetAndSet returns the raplaced value for the key if present. Otherwise, returns nil.
+// Value replaces by f.
+func (ce *Cache) GetAndSet(key string, f func(*Value) *Value) (setval *Value) {
+	ce.quMu.Lock()
+	if im, ok := ce.qu[key]; ok {
+		setval = f(im.Val)
+		ce.qu[key] = item{Key: key, Val: setval}
+		ce.quMu.Unlock()
+		return
+	}
+	ce.trMu.RLock()
+	r := ce.tr.Get(item{Key: key})
+	if r == nil {
+		ce.quMu.Unlock()
+		ce.trMu.RUnlock()
+		return
+	}
+	setval = f(r.(item).Val)
+	ce.qu[key] = item{Key: key, Val: setval}
+	ce.quMu.Unlock()
+	ce.trMu.RUnlock()
+	select {
+	case ce.quCh <- true:
+	default:
+	}
+	return
+}
