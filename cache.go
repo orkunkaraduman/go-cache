@@ -92,24 +92,27 @@ func (ce *Cache) queueWorker() {
 	}
 }
 
-// Get gets the value of a key. It returns nil, if the key doesn't exist.
-func (ce *Cache) Get(key string) *Value {
+// Get returns the value of given key. It returns nil, if the key wasn't exist.
+func (ce *Cache) Get(key string) (val *Value) {
 	ce.quMu.RLock()
 	if im, ok := ce.qu[key]; ok {
 		ce.quMu.RUnlock()
-		return im.Val
+		val = im.Val
+		return
 	}
 	ce.quMu.RUnlock()
 	ce.trMu.RLock()
-	defer ce.trMu.RUnlock()
 	r := ce.tr.Get(item{Key: key})
 	if r == nil {
-		return nil
+		ce.trMu.RUnlock()
+		return
 	}
-	return r.(item).Val
+	ce.trMu.RUnlock()
+	val = r.(item).Val
+	return
 }
 
-// Set sets the value of a key. It deletes the key, if val is nil.
+// Set sets the value of given key. It deletes the key, if the val is nil.
 func (ce *Cache) Set(key string, val *Value) {
 	ce.quMu.Lock()
 	ce.qu[key] = item{Key: key, Val: val}
@@ -123,4 +126,34 @@ func (ce *Cache) Set(key string, val *Value) {
 // Del deletes a key.
 func (ce *Cache) Del(key string) {
 	ce.Set(key, nil)
+}
+
+// GetOrSet returns the existing value for the key if present. Otherwise, it sets and returns the given value.
+// The found is true if the key was exist, false if set.
+func (ce *Cache) GetOrSet(key string, setval *Value) (val *Value, found bool) {
+	found = true
+	ce.quMu.Lock()
+	if im, ok := ce.qu[key]; ok {
+		ce.quMu.Unlock()
+		val = im.Val
+		return
+	}
+	ce.trMu.RLock()
+	r := ce.tr.Get(item{Key: key})
+	if r == nil {
+		ce.qu[key] = item{Key: key, Val: setval}
+		ce.quMu.Unlock()
+		ce.trMu.RUnlock()
+		select {
+		case ce.quCh <- true:
+		default:
+		}
+		val = setval
+		found = false
+		return
+	}
+	ce.quMu.Unlock()
+	ce.trMu.RUnlock()
+	val = r.(item).Val
+	return
 }
