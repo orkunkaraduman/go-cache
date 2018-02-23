@@ -1,3 +1,6 @@
+/*
+Package cache offers concurrency-safe in-memory cache based on b-tree and hash-map indexing.
+*/
 package cache
 
 import (
@@ -8,9 +11,11 @@ import (
 )
 
 var (
+	// DefaultDegree is default b-tree degree.
 	DefaultDegree = 4
 )
 
+// Cache struct is concurrency-safe in-memory cache based on b-tree and hash-map indexing.
 type Cache struct {
 	done   chan bool
 	tr     *btree.BTree
@@ -21,10 +26,12 @@ type Cache struct {
 	degree int
 }
 
+// NewCache returns a new Cache has default degree.
 func NewCache() (ce *Cache) {
 	return NewCacheDegree(DefaultDegree)
 }
 
+// NewCacheDegree returns a new Cache given degree.
 func NewCacheDegree(degree int) (ce *Cache) {
 	ce = &Cache{
 		done:   make(chan bool),
@@ -36,6 +43,7 @@ func NewCacheDegree(degree int) (ce *Cache) {
 	return
 }
 
+// Flush flushes the cache.
 func (ce *Cache) Flush() {
 	ce.trMu.Lock()
 	ce.tr = btree.New(ce.degree)
@@ -45,6 +53,7 @@ func (ce *Cache) Flush() {
 	ce.quMu.Unlock()
 }
 
+// Close closes the cache. It must be called if the cache will not use.
 func (ce *Cache) Close() {
 	ce.done <- true
 }
@@ -83,6 +92,7 @@ func (ce *Cache) queueWorker() {
 	}
 }
 
+// Get gets the value of a key. It returns nil, if the key doesn't exist.
 func (ce *Cache) Get(key string) *Value {
 	ce.quMu.RLock()
 	if im, ok := ce.qu[key]; ok {
@@ -99,6 +109,7 @@ func (ce *Cache) Get(key string) *Value {
 	return r.(item).Val
 }
 
+// Set sets the value of a key. It deletes the key, if val is nil.
 func (ce *Cache) Set(key string, val *Value) {
 	ce.quMu.Lock()
 	ce.qu[key] = item{Key: key, Val: val}
@@ -109,6 +120,7 @@ func (ce *Cache) Set(key string, val *Value) {
 	}
 }
 
+// Del deletes a key.
 func (ce *Cache) Del(key string) {
 	ce.Set(key, nil)
 }
