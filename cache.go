@@ -123,7 +123,7 @@ func (ce *Cache) Set(key string, val *Value) {
 	}
 }
 
-// Del deletes a key.
+// Del deletes the key.
 func (ce *Cache) Del(key string) {
 	ce.Set(key, nil)
 }
@@ -184,4 +184,32 @@ func (ce *Cache) GetAndSet(key string, f func(*Value) *Value) (setval *Value) {
 	default:
 	}
 	return
+}
+
+// Inc increases and the value of given key if the value is int or int64, and after returns new value.
+// Otherwise returns val.
+func (ce *Cache) Inc(key string, x int64) (val *Value) {
+	return ce.GetAndSet(key, func(val2 *Value) *Value {
+		switch val2.V.(type) {
+		case int:
+			return &Value{V: val2.V.(int) + int(x)}
+		case int64:
+			return &Value{V: val2.V.(int64) + int64(x)}
+		}
+		return val2
+	})
+}
+
+// Dec decreases and the value of given key if the value is int or int64, and after returns new value.
+// Otherwise returns val.
+func (ce *Cache) Dec(key string, x int64) (val *Value) {
+	return ce.GetAndSet(key, func(val2 *Value) *Value {
+		switch val2.V.(type) {
+		case int:
+			return &Value{V: val2.V.(int) - int(x)}
+		case int64:
+			return &Value{V: val2.V.(int64) - int64(x)}
+		}
+		return val2
+	})
 }
