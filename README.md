@@ -2,7 +2,8 @@
 
 [![GoDoc](https://godoc.org/github.com/go-cache/cache?status.svg)](https://godoc.org/github.com/go-cache/cache)
 
-Package cache offers concurrency-safe in-memory cache based on b-tree and hash-map indexing.
+Package cache offers concurrency safe in-memory cache based on b-tree and hash-map indexing.
+All methods of Cache struct are concurrency safe and operates cache atomically.
 
 ## Usage
 

@@ -1,5 +1,6 @@
 /*
-Package cache offers concurrency-safe in-memory cache based on b-tree and hash-map indexing.
+Package cache offers concurrency safe in-memory cache based on b-tree and hash-map indexing.
+All methods of Cache struct are concurrency safe and operates cache atomically.
 */
 package cache
 
@@ -15,7 +16,8 @@ var (
 	DefaultDegree = 4
 )
 
-// Cache struct is concurrency-safe in-memory cache based on b-tree and hash-map indexing.
+// Cache struct is concurrency safe in-memory cache based on b-tree and hash-map indexing.
+// All methods of Cache struct are concurrency safe and operates cache atomically.
 type Cache struct {
 	done   chan struct{}
 	tr     *btree.BTree
