@@ -8,7 +8,7 @@ import (
 
 type item struct {
 	Key string
-	Val *Value
+	Val interface{}
 }
 
 func (a item) Less(b btree.Item) bool {

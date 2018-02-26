@@ -95,7 +95,7 @@ func (ce *Cache) queueWorker() {
 }
 
 // Get returns the value of given key. It returns nil, if the key wasn't exist.
-func (ce *Cache) Get(key string) (val *Value) {
+func (ce *Cache) Get(key string) (val interface{}) {
 	ce.quMu.RLock()
 	if im, ok := ce.qu[key]; ok {
 		ce.quMu.RUnlock()
@@ -115,7 +115,7 @@ func (ce *Cache) Get(key string) (val *Value) {
 }
 
 // Set sets the value of given key. It deletes the key, if the val is nil.
-func (ce *Cache) Set(key string, val *Value) {
+func (ce *Cache) Set(key string, val interface{}) {
 	ce.quMu.Lock()
 	ce.qu[key] = item{Key: key, Val: val}
 	ce.quMu.Unlock()
@@ -132,7 +132,7 @@ func (ce *Cache) Del(key string) {
 
 // GetOrSet returns the existing value for the key if present. Otherwise, it sets and returns the given value.
 // The found is true if the key was exist, false if set.
-func (ce *Cache) GetOrSet(key string, setval *Value) (val *Value, found bool) {
+func (ce *Cache) GetOrSet(key string, setval interface{}) (val interface{}, found bool) {
 	found = true
 	ce.quMu.Lock()
 	if im, ok := ce.qu[key]; ok {
@@ -162,7 +162,7 @@ func (ce *Cache) GetOrSet(key string, setval *Value) (val *Value, found bool) {
 
 // GetAndSet returns the raplaced value for the key if present. Otherwise, returns nil.
 // Value replaces by f.
-func (ce *Cache) GetAndSet(key string, f func(*Value) *Value) (setval *Value) {
+func (ce *Cache) GetAndSet(key string, f func(interface{}) interface{}) (setval interface{}) {
 	ce.quMu.Lock()
 	if im, ok := ce.qu[key]; ok {
 		setval = f(im.Val)
@@ -190,13 +190,13 @@ func (ce *Cache) GetAndSet(key string, f func(*Value) *Value) (setval *Value) {
 
 // Inc increases and the value of given key if the value is int or int64, and after returns new value.
 // Otherwise returns val.
-func (ce *Cache) Inc(key string, x int64) (val *Value) {
-	return ce.GetAndSet(key, func(val2 *Value) *Value {
-		switch val2.V.(type) {
+func (ce *Cache) Inc(key string, x int64) (val interface{}) {
+	return ce.GetAndSet(key, func(val2 interface{}) interface{} {
+		switch val2.(type) {
 		case int:
-			return &Value{V: val2.V.(int) + int(x)}
+			return val2.(int) + int(x)
 		case int64:
-			return &Value{V: val2.V.(int64) + int64(x)}
+			return val2.(int64) + int64(x)
 		}
 		return val2
 	})
@@ -204,13 +204,13 @@ func (ce *Cache) Inc(key string, x int64) (val *Value) {
 
 // Dec decreases and the value of given key if the value is int or int64, and after returns new value.
 // Otherwise returns val.
-func (ce *Cache) Dec(key string, x int64) (val *Value) {
-	return ce.GetAndSet(key, func(val2 *Value) *Value {
-		switch val2.V.(type) {
+func (ce *Cache) Dec(key string, x int64) (val interface{}) {
+	return ce.GetAndSet(key, func(val2 interface{}) interface{} {
+		switch val2.(type) {
 		case int:
-			return &Value{V: val2.V.(int) - int(x)}
+			return val2.(int) - int(x)
 		case int64:
-			return &Value{V: val2.V.(int64) - int64(x)}
+			return val2.(int64) - int64(x)
 		}
 		return val2
 	})
