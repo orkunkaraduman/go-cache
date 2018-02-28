@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/go-cache/cache"
+	"github.com/orkunkaraduman/experimental-go-cache"
 )
 
 func main() {
