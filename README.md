@@ -3,4 +3,4 @@
 Package cache offers concurrency safe in-memory cache based on b-tree and hash-map indexing.
 All methods of Cache struct are concurrency safe and operates cache atomically.
 
-It is experimental project. Don't use in production.
+This is experimental project. Don't use in production.
