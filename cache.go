@@ -5,7 +5,6 @@ All methods of Cache struct are concurrency safe and operates cache atomically.
 package cache
 
 import (
-	"runtime"
 	"sync"
 
 	"github.com/google/btree"
@@ -22,9 +21,7 @@ type Cache struct {
 	done   chan struct{}
 	tr     *btree.BTree
 	trMu   sync.RWMutex
-	qu     map[string]item
-	quMu   sync.RWMutex
-	quCh   chan struct{}
+	qu     chan *item
 	degree int
 }
 
@@ -37,7 +34,7 @@ func NewCache() (ce *Cache) {
 func NewCacheDegree(degree int) (ce *Cache) {
 	ce = &Cache{
 		done:   make(chan struct{}),
-		quCh:   make(chan struct{}, 1<<10),
+		qu:     make(chan *item, 1024),
 		degree: degree,
 	}
 	ce.Flush()
@@ -49,60 +46,43 @@ func NewCacheDegree(degree int) (ce *Cache) {
 func (ce *Cache) Flush() {
 	ce.trMu.Lock()
 	ce.tr = btree.New(ce.degree)
-	ce.quMu.Lock()
 	ce.trMu.Unlock()
-	ce.qu = make(map[string]item)
-	ce.quMu.Unlock()
+	//ce.qu = make(chan *item, 1024)
 }
 
 // Close closes the cache. It must be called if the cache will not use.
 func (ce *Cache) Close() {
 	ce.done <- struct{}{}
+	close(ce.qu)
 }
 
 func (ce *Cache) queueWorker() {
-	for {
-		select {
-		case <-ce.done:
-			return
-		case <-ce.quCh:
+	for im := range ce.qu {
+		ce.trMu.Lock()
+		if im.Val != nil {
+			ce.tr.ReplaceOrInsert(*im)
+		} else {
+			ce.tr.Delete(*im)
 		}
-		for {
-			var im item
-			var found bool
-			ce.quMu.Lock()
-			for key := range ce.qu {
-				im = ce.qu[key]
-				found = true
-				delete(ce.qu, key)
-				break
-			}
-			if !found {
-				ce.quMu.Unlock()
-				break
-			}
-			ce.trMu.Lock()
-			ce.quMu.Unlock()
-			if im.Val != nil {
-				ce.tr.ReplaceOrInsert(im)
-			} else {
-				ce.tr.Delete(im)
-			}
-			ce.trMu.Unlock()
-			runtime.Gosched()
-		}
+		ce.trMu.Unlock()
 	}
 }
 
 // Get returns the value of given key. It returns nil, if the key wasn't exist.
 func (ce *Cache) Get(key string) (val interface{}) {
-	ce.quMu.RLock()
-	if im, ok := ce.qu[key]; ok {
-		ce.quMu.RUnlock()
-		val = im.Val
-		return
+	done := false
+	for !done {
+		select {
+		case im := <-ce.qu:
+			if im.Key == key {
+				val = im.Val
+				return
+			}
+			ce.qu <- im
+		default:
+			done = true
+		}
 	}
-	ce.quMu.RUnlock()
 	ce.trMu.RLock()
 	r := ce.tr.Get(item{Key: key})
 	if r == nil {
@@ -116,13 +96,7 @@ func (ce *Cache) Get(key string) (val interface{}) {
 
 // Set sets the value of given key. It deletes the key, if the val is nil.
 func (ce *Cache) Set(key string, val interface{}) {
-	ce.quMu.Lock()
-	ce.qu[key] = item{Key: key, Val: val}
-	ce.quMu.Unlock()
-	select {
-	case ce.quCh <- struct{}{}:
-	default:
-	}
+	ce.qu <- &item{Key: key, Val: val}
 }
 
 // Del deletes the key.
@@ -130,7 +104,7 @@ func (ce *Cache) Del(key string) {
 	ce.Set(key, nil)
 }
 
-// GetOrSet returns the existing value for the key if present. Otherwise, it sets and returns the given value.
+/*// GetOrSet returns the existing value for the key if present. Otherwise, it sets and returns the given value.
 // If the key was exist, the found is true.
 func (ce *Cache) GetOrSet(key string, newVal interface{}) (oldVal interface{}, found bool) {
 	found = true
@@ -218,4 +192,4 @@ func (ce *Cache) Dec(key string, x int64) (val interface{}) {
 		}
 		return val2
 	})
-}
+}*/
